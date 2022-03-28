@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import LabelEncoder
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 import os
 
 # Global variables
@@ -22,6 +23,7 @@ with siteHeader:
         if filename is not None:
             input = pd.read_csv(filename)
             df = input.copy()
+            if "Unnamed: 0" in df.columns: df.drop("Unnamed: 0",inplace=True,axis=1)
 
     except FileNotFoundError:
         st.error('File not found.')
@@ -63,8 +65,9 @@ with dataExploration:
         st.subheader("Analyse Exploratoire Bivariée")
         col1, col2 = st.columns(2)
         feature_x = col1.selectbox("Premiere variable", newdf.columns)
-        feature_y = col2.selectbox("Deuxieme variable", newdf.drop(feature_x, axis=1).columns)
-        st.bar_chart(newdf.corr()[feature_x].drop(feature_x))
+        # feature_y = col2.selectbox("Deuxieme variable", newdf.drop(feature_x, axis=1).columns)
+        st.write("Graphe des corrélation entre **"+feature_x+"** et le reste des features")
+        st.bar_chart(newdf.corr()[feature_x].drop(feature_x),)
         corr=newdf.corr()
         fig3, ax3 = plt.subplots()
         ax3.set_title("Matrice de corrélation \n")
@@ -75,10 +78,10 @@ with dataExploration:
 with preprocessing:
     try:
         # Preprocessing
-        st.write('Preprocessing:')
+        st.title('Preprocessing:')
         st.write('Quel est votre outcome ?')
         output_var = st.selectbox('', df.columns)
-        df[output_var+'_ouput']= LabelEncoder().fit_transform(df[[output_var]])
+        df[output_var+'_ouput']= LabelEncoder().fit_transform(df[[output_var]].values)
         droped_vars = st.multiselect('Quelles colonnes voulez vous supprimer ?', df.columns)
         df = df.drop(droped_vars, axis=1)
         st.write('Quels prétraitements souhaitez vous appliquer à vos features ?')
@@ -91,7 +94,13 @@ with preprocessing:
             if dummification: df = pd.get_dummies(df, columns=newdf2.drop(output_var, axis=1).columns)
         except KeyError:
             if dummification: df = pd.get_dummies(df, columns=newdf2.columns)
+        def normelize(x):
+            if (x.dtype in numerics) and (output_var+'_ouput'!= x.name):
+                return MinMaxScaler().fit_transform(np.array(x)[:, np.newaxis]).flatten()
+            else: return x
         if valeurs_manquantes: df = df.dropna()
+        if normalisation: df=df.apply(normelize)
+        # if outliers: df= df[df.apply(lambda x: np.abs(x - x.mean()) / x.std() < 3).all(axis=1)]
         st.table(df.head())
     except:
         st.warning('An error occured during preprocessing')
